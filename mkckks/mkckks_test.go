@@ -13,9 +13,10 @@ import (
 	"github.com/ldsec/lattigo/v2/rlwe"
 	"github.com/ldsec/lattigo/v2/utils"
 
-	"github.com/stretchr/testify/require"
 	"math"
 	"math/cmplx"
+
+	"github.com/stretchr/testify/require"
 )
 
 var maxUsers = flag.Int("n", 4, "maximum number of parties")

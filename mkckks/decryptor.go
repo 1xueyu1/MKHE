@@ -1,7 +1,10 @@
 package mkckks
 
-import "github.com/ldsec/lattigo/v2/ckks"
-import "mk-lattigo/mkrlwe"
+import (
+	"mk-lattigo/mkrlwe"
+
+	"github.com/ldsec/lattigo/v2/ckks"
+)
 
 type Decryptor struct {
 	*mkrlwe.Decryptor

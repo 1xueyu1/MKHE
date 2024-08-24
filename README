@@ -5,18 +5,99 @@ LICENSE
 ===============
 Attribution-NonCommercial 2.0 Generic (CC BY-NC 2.0)
 
+GO开发环境安装 2024/1/18 lzh
+参考链接：https://juejin.cn/post/7102970555401240607
+===================
+1. 下载go安装包
+wget https://studygolang.com/dl/golang/go1.21.6.linux-amd64.tar.gz
+2. 安装包解压（/usr/local自己指定即可）
+tar -C /usr/local -xzf go1.21.6.linux-amd64.tar.gz
+3. 环境变量设置
+首先进入编辑模式
+vim ~/.bash_profil
+配置文件插入内容：
+export GOPATH=/home/工作区路径/go
+export GOROOT=源目录/go
+export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+更新配置
+source ~/.bashrc
+4. 进入工作目录，下载指定模块及其依赖项（该目录下go子目录和go.sum需要在这一步重新生成） 
+go mod download github.com/ldsec/lattigo
+问题：timeout 
+解决方案——切换代理：export GOPROXY=https://goproxy.cn
+5. 继续下载指定模块及其依赖项（缺什么补什么 按照报错信息来）
+如：
+go get -t mk-lattigo/cnn
+go get mk-lattigo/cnn
+...
+至此开发环境安装完毕
+按照以下步骤继续执行代码功能
+vscode 远程调试GO程序 可参考https://www.notion.so/CKKS-a8b2a1bf89c54f3eadb9737cff0601eb
+
+
+
 HOW TO INSTALL
-==============
+===============
 use "go mod vendor" 
 
 
-HOW TO RUN UNITTEST
+HOW TO RUN UNITTEST 单元测试
 ===================
 1. go to target folder (e.g for mkckks "cd mkckks")
-2. run go test command "go test -args -n=x" (x is the number of parties e.g for 2 parites set x to 2)
+2. run go test command "go test -v -args -n=x" (x is the number of parties e.g for 2 parites set x to 2)
+结果演示：
+=== RUN   TestCKKS
+=== RUN   TestCKKS/MKCKKSEncAndDec:_2/_logN=15/LogSlots=14/logQP=880/levels=14/
+=== RUN   TestCKKS/MKMulAndRelin:_2/_logN=15/LogSlots=14/logQP=880/levels=14/
+=== RUN   TestCKKS/MKCKKSEncAndDec:_2/_logN=14/LogSlots=13/logQP=439/levels=6/
+=== RUN   TestCKKS/MKMulAndRelin:_2/_logN=14/LogSlots=13/logQP=439/levels=6/
+--- PASS: TestCKKS (10.45s)
+    --- PASS: TestCKKS/MKCKKSEncAndDec:_2/_logN=15/LogSlots=14/logQP=880/levels=14/ (0.24s) // 加解密测试
+    --- PASS: TestCKKS/MKMulAndRelin:_2/_logN=15/LogSlots=14/logQP=880/levels=14/ (1.40s) // 乘法与重线性化测试
+    --- PASS: TestCKKS/MKCKKSEncAndDec:_2/_logN=14/LogSlots=13/logQP=439/levels=6/ (0.07s) // 加解密测试
+    --- PASS: TestCKKS/MKMulAndRelin:_2/_logN=14/LogSlots=13/logQP=439/levels=6/ (0.18s) // 乘法与重线性化测试
+PASS
+ok      mk-lattigo/mkckks       10.616s
 
 
-HOW TO RUN BENCHMARK
+
+HOW TO RUN BENCHMARK 基准测试
 ====================
 1. go to target folder (e.g for mkckks "cd mkckks")
 2. run go benchmark command "go test -bench=. -benchtime=10x -timeout=0 -args -n=4" (This runs 10 repetition of benchmark for the 4 party case)
+====================================================================================================
+结果演示：
+go test -bench=. -benchtime=10x -timeout=0 -args -n=4
+goos: linux
+goarch: amd64
+pkg: mk-lattigo/mkckks
+cpu: Intel(R) Xeon(R) Gold 6330N CPU @ 2.20GHz
+BenchmarkMKCKKS/MKMulAndRelin:_2/_logN=14/LogSlots=13/logQP=439/levels=6/-112                 10         135644688 ns/op
+BenchmarkMKCKKS/MKMulAndRelin:_4/_logN=14/LogSlots=13/logQP=439/levels=6/-112                 10         262431914 ns/op
+BenchmarkMKCKKS/MKMulAndRelin:_2/_logN=15/LogSlots=14/logQP=880/levels=14/-112                10        1209729042 ns/op
+BenchmarkMKCKKS/MKMulAndRelin:_4/_logN=15/LogSlots=14/logQP=880/levels=14/-112                10        2212431454 ns/op
+PASS
+ok      mk-lattigo/mkckks       69.956s
+====================================================================================================
+解读：
+1. 两个用户的情况：
+    - _logN=14/LogSlots=13/logQP=439/levels=6: 平均时间为 177,655,435 纳秒/op
+    - _logN=15/LogSlots=14/logQP=880/levels=14: 平均时间为 1,315,853,998 纳秒/op
+2. 四个用户的情况：
+    - _logN=14/LogSlots=13/logQP=439/levels=6: 平均时间为 345,083,047 纳秒/op
+    - _logN=15/LogSlots=14/logQP=880/levels=14: 平均时间为 2,486,514,199 纳秒/op
+
+
+HOW TO RUN mkcnn 
+===================
+1. go to target folder
+2. run go test command "go test -run TestCNN" 
+====================================================================================================
+结果演示：初始化阶段仍然占据了大量时间
+初始化阶段执行时间：6.177994351s
+数据读取阶段执行时间：554.689864ms
+加密阶段执行时间：549.385907ms
+同态运算（卷积）阶段执行时间：2.305194361s
+解密阶段执行时间：2.001244ms
+PASS
+ok      mk-lattigo/cnn  9.646s

@@ -1,0 +1,19 @@
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
+# github.com/ldsec/lattigo/v2 v2.3.0
+github.com/ldsec/lattigo/v2/bfv
+github.com/ldsec/lattigo/v2/ckks
+github.com/ldsec/lattigo/v2/ring
+github.com/ldsec/lattigo/v2/rlwe
+github.com/ldsec/lattigo/v2/utils
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
+# github.com/stretchr/testify v1.7.0
+github.com/stretchr/testify/assert
+github.com/stretchr/testify/require
+# golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
+golang.org/x/crypto/blake2b
+# golang.org/x/sys v0.0.0-20211007075335-d3039528d8ac
+golang.org/x/sys/cpu
+# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+gopkg.in/yaml.v3
