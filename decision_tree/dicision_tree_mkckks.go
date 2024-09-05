@@ -9,6 +9,7 @@ import (
 	"mk-lattigo/mkrlwe"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/ldsec/lattigo/v2/ckks"
 )
@@ -32,21 +33,34 @@ type DataPointCt struct {
 }
 
 func main() {
-	// -------------------------------LogScal, LogSlots
+
+	// 写入文件中保存
+	file, _ := os.OpenFile("./result/desion_tree_MKHE.txt", os.O_APPEND|os.O_CREATE|os.O_RDWR, 0664)
+
+	beginTime := time.Now()
+
 	ckksParams, err := ckks.NewParametersFromLiteral(ckks.PN15QP880)
 	if err != nil {
 		panic(err)
 	}
 	params := mkckks.NewParameters(ckksParams)
 
-	// 更换数据
-	// 多密钥版本------------------------多密钥版本
+	genParaTime := time.Since(beginTime)
+	fmt.Fprintf(file, "参数 PN15QP880\n")
+	fmt.Fprintf(file, "生成参数耗时：%s \n", genParaTime.String())
+
 	// generate keys
 	kgen := mkckks.NewKeyGenerator(params)
-	sk := kgen.GenSecretKey("user1")
 	skSet := mkrlwe.NewSecretKeySet()
-	skSet.AddSecretKey(sk)
-	pk := kgen.GenPublicKey(sk)
+	sk1 := kgen.GenSecretKey("data")
+	sk2 := kgen.GenSecretKey("model")
+	pk1 := kgen.GenPublicKey(sk1)
+	pk2 := kgen.GenPublicKey(sk2)
+	skSet.AddSecretKey(sk1)
+	skSet.AddSecretKey(sk2)
+
+	genKeyTime := time.Since(beginTime)
+	fmt.Fprintf(file, "生成密钥耗时：%s \n", (genKeyTime - genParaTime).String())
 
 	// create encryptor and decryptor
 	encryptor := mkckks.NewEncryptor(params)
@@ -62,18 +76,10 @@ func main() {
 	// shuffle the data
 	rand.Shuffle(len(data), func(i, j int) { data[i], data[j] = data[j], data[i] })
 	train_data := data[0:125]
-	test_data := data[125:150]
+	test_data := data[125:]
 
-	// 用 train_data 训练出决策树
-	tree := buildTree(train_data, 0, 10, encryptor, pk)
-	// 将 test_data 数据进行加密
-	encrypt_test_data := encryptDataPoint(test_data, *encryptor, pk)
-
-	// 写入文件中保存
-	file, err := os.Create("./4.txt")
-	if err != nil {
-		panic(err)
-	}
+	tree := buildTree(train_data, 0, 10, encryptor, pk2)
+	encrypt_test_data := encryptDataPoint(test_data, *encryptor, pk1)
 
 	cnt := 0.0
 	// 预测加密的 test_data 数据
@@ -84,20 +90,22 @@ func main() {
 		predict_msgOut := decryptor.Decrypt(&predict_ct, skSet)
 		// 比对结果是否正确
 		str := strconv.FormatFloat(real(predict_msgOut.Value[0]), 'f', 0, 64)
-		target, err := strconv.ParseInt(str, 10, 64)
-		if err != nil {
-			panic(err)
-		}
+		target, _ := strconv.ParseInt(str, 10, 64)
+
 		if target == int64(test_data[i].Label) {
 			cnt += 1
 		}
 		s := "Actual: " + strconv.Itoa(test_data[i].Label) + "  predict: " + str + "\n"
-		file.WriteString(s)
 		fmt.Print(s)
 	}
-	predict_correction := cnt / 25.0
-	file.WriteString("\n" + strconv.FormatFloat(predict_correction, 'f', 5, 64))
-	fmt.Printf("\n%f\n", predict_correction)
+	testDataSize := len(encrypt_test_data)
+	accuracy := cnt / float64(testDataSize)
+	fmt.Printf("\n%f\n", accuracy)
+
+	endTime := time.Since(beginTime)
+	fmt.Fprintf(file, "总耗时：%s \n", endTime.String())
+	fmt.Fprintf(file, "正确率：%f \n\n", accuracy)
+
 	file.Close()
 }
 
