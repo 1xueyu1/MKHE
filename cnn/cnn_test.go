@@ -131,7 +131,7 @@ func TestCNN(t *testing.T) {
 	imageIndex := 2 // 选择要加密的图像索引
 	// 加密图像
 	ctImage := encryptImage(testContext, dataOwner, imageIndex)
-	// 加密卷积核
+	// 获得一个大小为4数组，每个数组存放一个卷积核，
 	ctKernels := encryptKernels(testContext, modelOwner)
 	// 加密全连接层1的权重
 	ctFC1 := encryptFC1(testContext, modelOwner)
@@ -149,9 +149,7 @@ func TestCNN(t *testing.T) {
 	// 获取旋转密钥集(使得在加密域内能够进行复杂的矩阵运算和向量操作)
 	rtkSet := testContext.rtkSet
 
-	// 将加密图像转换为提升形式
-	// 卷积操作需要对输入图像的密文进行多次旋转和乘法，使用提升形式可以显著提高这些操作的效率
-	// 全连接层中的矩阵乘法操作也会从提升形式中受益，使得矩阵向量乘法更高效
+	// 将加密图像转换为提升形式, 以便进行更高级的运算
 	ctImageHoisted := eval.HoistedForm(ctImage)
 	// 初始化提升形式的卷积核数组
 	ctKernelsHoisted := make([]*mkrlwe.HoistedCiphertext, len(ctKernels))
@@ -181,8 +179,7 @@ func TestCNN(t *testing.T) {
 	// 编码消息为明文
 	ptMask := testContext.encryptor.EncodeMsgNew(msg)
 
-	// 评估部分
-	// 执行卷积操作==========================？
+	// 执行卷积操作
 	convOut := Convolution(eval, rlkSet, rtkSet, ctImage, ctImageHoisted, ctKernels, ctKernelsHoisted)
 
 	// 将卷积输出转换为提升形式
@@ -456,9 +453,9 @@ func encryptKernels(testContext *testParams, id string) (ctOut []*mkckks.Ciphert
 			encodedKernels[i] = make([]complex128, 8192)
 		}
 
-		// 因为共享参数所以和重复多次 和image大小相同？
+		// 将4x4的卷积核分成2x2的像素块, 每个块有4个像素点, 一共4块，每一块的四个像素点放入encodedKernels
+		// encodedKernels[0:4]4个数组存放2x2像素块中的4组像素点
 		for i := 0; i < numKernels; i++ {
-			// 卷积核	共享参数？
 			for j := 0; j < convOutSize; j++ {
 				for k := 0; k < convOutSize; k++ {
 					index := blockSize*blockSize*i + blockSize*j + k

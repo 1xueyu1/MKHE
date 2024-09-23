@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/csv"
 	"fmt"
 	"math"
@@ -39,14 +40,14 @@ func main() {
 
 	beginTime := time.Now()
 
-	ckksParams, err := ckks.NewParametersFromLiteral(ckks.PN15QP880)
+	ckksParams, err := ckks.NewParametersFromLiteral(ckks.PN14QP438)
 	if err != nil {
 		panic(err)
 	}
 	params := mkckks.NewParameters(ckksParams)
 
 	genParaTime := time.Since(beginTime)
-	fmt.Fprintf(file, "参数 PN15QP880\n")
+	fmt.Fprintf(file, "参数 PN14QP438\n")
 	fmt.Fprintf(file, "生成参数耗时：%s \n", genParaTime.String())
 
 	// generate keys
@@ -58,6 +59,14 @@ func main() {
 	pk2 := kgen.GenPublicKey(sk2)
 	skSet.AddSecretKey(sk1)
 	skSet.AddSecretKey(sk2)
+
+	// 输出密钥
+	sk1Data, _ := sk1.MarshalBinary()
+	sk2Data, _ := sk2.MarshalBinary()
+	sk1Base64 := base64.StdEncoding.EncodeToString(sk1Data)
+	sk2Base64 := base64.StdEncoding.EncodeToString(sk2Data)
+	fmt.Println(sk1Base64)
+	fmt.Println(sk2Base64)
 
 	genKeyTime := time.Since(beginTime)
 	fmt.Fprintf(file, "生成密钥耗时：%s \n", (genKeyTime - genParaTime).String())

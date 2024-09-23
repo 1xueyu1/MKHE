@@ -13,10 +13,7 @@ func Convolution(eval *mkckks.Evaluator, rlkSet *mkrlwe.RelinearizationKeySet, r
 	ctImage *mkckks.Ciphertext, ctImageHoisted *mkrlwe.HoistedCiphertext,
 	ctKernels []*mkckks.Ciphertext, ctKernelsHoisted []*mkrlwe.HoistedCiphertext) (convOut *mkckks.Ciphertext) {
 
-	/*
-		kernel提取特征，为什么要旋转(移动卷积核？)？为什么选这几个位置旋转？
-	*/
-
+	// 对四个卷积核提取的特征提取出来
 	// 初始化卷积输出，通过第一个内核与图像进行乘法和重新线性化
 	convOut = eval.MulRelinHoistedNew(ctImage, ctKernels[0], ctImageHoisted, ctKernelsHoisted[0], rlkSet)
 
