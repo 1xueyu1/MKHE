@@ -232,6 +232,6 @@ func main() {
 	fmt.Fprintf(file, "正确率：%f\n", accuracy)
 
 	endTime := time.Since(beginTime)
-	fmt.Println("Run time: ", endTime)
-	fmt.Fprintf(file, "Run time: "+endTime.String()+"\n\n")
+	fmt.Println("\nRun time: ", endTime)
+	fmt.Fprintf(file, "\nRun time: "+endTime.String()+"\n\n")
 }
