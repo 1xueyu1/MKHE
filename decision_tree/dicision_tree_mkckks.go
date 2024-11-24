@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/csv"
 	"fmt"
 	"math"
@@ -59,15 +58,15 @@ func main() {
 	pk2 := kgen.GenPublicKey(sk2)
 	skSet.AddSecretKey(sk1)
 	skSet.AddSecretKey(sk2)
-
-	// 输出密钥
-	sk1Data, _ := sk1.MarshalBinary()
-	sk2Data, _ := sk2.MarshalBinary()
-	sk1Base64 := base64.StdEncoding.EncodeToString(sk1Data)
-	sk2Base64 := base64.StdEncoding.EncodeToString(sk2Data)
-	fmt.Println(sk1Base64)
-	fmt.Println(sk2Base64)
-
+	/*
+		// 输出密钥
+		sk1Data, _ := sk1.MarshalBinary()
+		sk2Data, _ := sk2.MarshalBinary()
+		sk1Base64 := base64.StdEncoding.EncodeToString(sk1Data)
+		sk2Base64 := base64.StdEncoding.EncodeToString(sk2Data)
+		fmt.Println(sk1Base64)
+		fmt.Println(sk2Base64)
+	*/
 	genKeyTime := time.Since(beginTime)
 	fmt.Fprintf(file, "生成密钥耗时：%s \n", (genKeyTime - genParaTime).String())
 
@@ -76,18 +75,23 @@ func main() {
 	decryptor := mkckks.NewDecryptor(params)
 	evaluator := mkckks.NewEvaluator(params)
 
-	// 读取CSV文件
-	data, err := readCSV("./iris/iris.csv")
-	if err != nil {
-		panic(err)
-	}
+	/*
+		// 读取CSV文件
+		data, err := readCSV("./iris/iris.csv")
+		if err != nil {
+			panic(err)
+		}
+	*/
+
+	// 读取Obesity数据
+	data, _ := readObesity()
 
 	// shuffle the data
 	rand.Shuffle(len(data), func(i, j int) { data[i], data[j] = data[j], data[i] })
-	train_data := data[0:125]
-	test_data := data[125:]
+	train_data := data[0:1600]
+	test_data := data[1600:1800]
 
-	tree := buildTree(train_data, 0, 10, encryptor, pk2)
+	tree := buildTree(train_data, 0, 30, encryptor, pk2)
 	encrypt_test_data := encryptDataPoint(test_data, *encryptor, pk1)
 
 	cnt := 0.0
@@ -98,7 +102,7 @@ func main() {
 		// 将预测结果解密
 		predict_msgOut := decryptor.Decrypt(&predict_ct, skSet)
 		// 比对结果是否正确
-		str := strconv.FormatFloat(real(predict_msgOut.Value[0]), 'f', 0, 64)
+		str := strconv.FormatFloat(math.Abs(real(predict_msgOut.Value[0])), 'f', 0, 64)
 		target, _ := strconv.ParseInt(str, 10, 64)
 
 		if target == int64(test_data[i].Label) {
@@ -112,10 +116,88 @@ func main() {
 	fmt.Printf("\n%f\n", accuracy)
 
 	endTime := time.Since(beginTime)
+	fmt.Fprintf(file, "测试数据量：%d \n", testDataSize)
 	fmt.Fprintf(file, "总耗时：%s \n", endTime.String())
 	fmt.Fprintf(file, "正确率：%f \n\n", accuracy)
 
 	file.Close()
+}
+
+// 调取肥胖数据集
+func readObesity() ([]DataPoint, error) {
+	// convert string to float/boolean
+	string2numerical := make(map[string]float64)
+
+	// convert gender to boolean
+	string2numerical["Male"] = 1.0
+	string2numerical["Female"] = 0.0
+
+	// convert yes/no to boolean
+	string2numerical["yes"] = 1.0
+	string2numerical["no"] = 0.0
+
+	// convert CAEC and CALC to numerical
+	string2numerical["Always"] = 3.0
+	string2numerical["Frequently"] = 2.0
+	string2numerical["Sometimes"] = 1.0
+	string2numerical["no"] = 0.0
+
+	// convert transportation to numerical
+	string2numerical["Public_Transportation"] = 4.0
+	string2numerical["Automobile"] = 3.0
+	string2numerical["Motorbike"] = 2.0
+	string2numerical["Walking"] = 1.0
+	string2numerical["Bike"] = 0.0
+
+	// Labels
+	string2int := make(map[string]int)
+	string2int["Insufficient_Weight"] = 0
+	string2int["Normal_Weight"] = 1
+	string2int["Overweight_Level_I"] = 2
+	string2int["Overweight_Level_II"] = 3
+	string2int["Obesity_Type_I"] = 4
+	string2int["Obesity_Type_II"] = 5
+	string2int["Obesity_Type_III"] = 6
+
+	file, err := os.Open("./obesity/obesity.csv")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	// discard the header
+	records = records[1:]
+	var data []DataPoint
+	for _, record := range records {
+		var features []float64
+		for _, value := range record[:len(record)-1] {
+			_, exists := string2numerical[value]
+			if exists {
+				features = append(features, string2numerical[value])
+			} else {
+				feature, err := strconv.ParseFloat(value, 64)
+				if err != nil {
+					return nil, err
+				}
+				features = append(features, feature)
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+		label := int(0)
+		name := record[len(record)-1]
+		label = string2int[name]
+		data = append(data, DataPoint{Features: features, Label: label})
+	}
+
+	return data, nil
 }
 
 // 将 DataPoint 的数据加密为 DataPointCt

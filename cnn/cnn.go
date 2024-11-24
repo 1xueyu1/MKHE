@@ -15,6 +15,7 @@ func Convolution(eval *mkckks.Evaluator, rlkSet *mkrlwe.RelinearizationKeySet, r
 
 	// 对四个卷积核提取的特征提取出来
 	// 初始化卷积输出，通过第一个内核与图像进行乘法和重新线性化
+	// ctKernels[0:4]4个数组存放2x2像素块中的4组像素点
 	convOut = eval.MulRelinHoistedNew(ctImage, ctKernels[0], ctImageHoisted, ctKernelsHoisted[0], rlkSet)
 
 	// 将图像旋转1个位置并转换为提升形式
