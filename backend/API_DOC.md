@@ -579,3 +579,137 @@ def finish_round(round_num: int):
 | **加密耗时** | 单次加密（≤slots 权重）约 50-100ms |
 | **聚合耗时** | N 个客户端同态加法约 N×10ms，FedAvg 额外 +50ms（常数乘+rescale）|
 | **状态重置** | 重新调用 /system/init 会清除所有密文和密钥，重新开始 |
+
+---
+
+## 实验追踪与绘图（新增）
+
+为了支持论文实验和可复现对比，后端新增了实验追踪能力：
+
+- 自动记录核心链路耗时与产物数量（init/register/encrypt/aggregate/decrypt/...）
+- 支持手动记录自定义实验事件（如精度、loss、通信量）
+- 支持导出 `events.csv`，以及直接返回可绘图的 `plot-data`
+
+### 实验日志目录
+
+- 默认目录: `./experiment_logs`
+- 可通过环境变量覆盖: `MKHE_EXPERIMENT_DIR=/path/to/logs`
+
+每个实验会创建独立目录：
+
+```text
+experiment_logs/
+  exp-20260310-110102-1a2b3c4d/
+    meta.json
+    summary.json
+    events.jsonl
+    events.csv          # 调用导出接口后生成
+```
+
+### 实验接口一览
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/experiments/start` | 启动实验 |
+| POST | `/api/v1/experiments/stop` | 停止实验 |
+| GET  | `/api/v1/experiments` | 列出实验 |
+| GET  | `/api/v1/experiments/active` | 查看当前激活实验 |
+| POST | `/api/v1/experiments/event` | 手动写入实验事件 |
+| GET  | `/api/v1/experiments/{id}/summary` | 获取实验汇总 |
+| GET  | `/api/v1/experiments/{id}/events` | 获取事件列表（支持 `?limit=`） |
+| GET  | `/api/v1/experiments/{id}/events.csv` | 导出 CSV |
+| GET  | `/api/v1/experiments/{id}/plot-data` | 获取画图数据 |
+
+### 1) 启动实验
+
+`POST /api/v1/experiments/start`
+
+```json
+{
+  "name": "fedavg-mkhe-logN14",
+  "description": "3 clients, mnist cnn, average=true",
+  "tags": {
+    "dataset": "mnist",
+    "clients": "3",
+    "scheme": "mkckks"
+  },
+  "set_active": true
+}
+```
+
+### 2) 在核心接口里关联实验
+
+你可以在请求体中带可选字段 `experiment_id`，例如：
+
+```json
+{
+  "client_id": "client_0",
+  "weights": [0.1, 0.2],
+  "round": 1,
+  "experiment_id": "exp-20260310-110102-1a2b3c4d"
+}
+```
+
+如果不传 `experiment_id`，后端会尝试使用当前 active 实验，或请求头 `X-Experiment-ID`。
+
+### 3) 手动记录自定义指标
+
+`POST /api/v1/experiments/event`
+
+```json
+{
+  "experiment_id": "exp-20260310-110102-1a2b3c4d",
+  "round": 1,
+  "operation": "accuracy_eval",
+  "status": "success",
+  "duration_ms": 4.2,
+  "metrics": {
+    "accuracy": 0.934,
+    "loss": 0.182
+  },
+  "metadata": {
+    "model": "cnn"
+  }
+}
+```
+
+### 4) 获取绘图数据
+
+`GET /api/v1/experiments/{id}/plot-data`
+
+返回包括：
+
+- `latency_by_operation`: 各操作按轮次平均耗时
+- `output_cipher_by_round`: 每轮输出密文数量
+- `throughput_by_round`: 每轮权重处理吞吐（weights/s）
+- `event_count_by_operation`: 各操作事件数
+
+### 5) 一键生成图像
+
+仓库提供脚本：`backend/plot_experiment.py`
+
+```bash
+python backend/plot_experiment.py \
+  --experiment-id exp-20260310-110102-1a2b3c4d \
+  --base-url http://localhost:8082/api/v1 \
+  --output-dir backend/experiment_plots
+```
+
+输出图像：
+
+- `latency_by_operation.png`
+- `output_cipher_by_round.png`
+- `throughput_by_round.png`
+- `event_count_by_operation.png`
+
+### 6) 推荐实验记录模板
+
+建议每组实验至少固定记录以下维度：
+
+- `logN`
+- 客户端数量 `N`
+- 每轮 `encrypt/aggregate/decrypt` 平均耗时
+- 每轮通信体积（可用手动 event 的 metrics 记录）
+- 精度/损失曲线（手动 event）
+
+这样后续可以直接画出：精度对比图、时延对比图、吞吐对比图、通信开销图。

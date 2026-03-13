@@ -14,6 +14,9 @@ import (
 // 全局 HE 服务实例
 var service *HEService
 
+// 全局实验追踪器
+var experimentTracker *ExperimentTracker
+
 // 服务启动时间（健康检查用）
 var startTime time.Time
 
@@ -33,6 +36,14 @@ func success(w http.ResponseWriter, msg string, data interface{}) {
 
 func fail(w http.ResponseWriter, httpCode int, msg string) {
 	writeJSON(w, httpCode, Response{Code: 1, Message: msg})
+}
+
+func totalCipherInputs(groups [][]string) int {
+	total := 0
+	for _, group := range groups {
+		total += len(group)
+	}
+	return total
 }
 
 // ================================================================
@@ -85,11 +96,14 @@ func initHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp, err := service.Init(req.LogN, req.ClientIDs)
 	if err != nil {
+		recordServiceEvent(r, req.ExperimentID, "system_init", start, 0, "", "", 0, 0, 0, err)
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	recordServiceEvent(r, req.ExperimentID, "system_init", start, 0, "", "", 0, 0, 0, nil)
 
 	success(w, "MKHE 系统初始化成功", resp)
 }
@@ -133,11 +147,14 @@ func registerClientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp, err := service.RegisterClient(req.ClientID)
 	if err != nil {
+		recordServiceEvent(r, req.ExperimentID, "client_register", start, 0, req.ClientID, "", 0, 0, 0, err)
 		fail(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	recordServiceEvent(r, req.ExperimentID, "client_register", start, 0, req.ClientID, "", 0, 0, 0, nil)
 
 	success(w, "客户端注册成功", resp)
 }
@@ -163,11 +180,14 @@ func encryptModelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp, err := service.EncryptModel(req.ClientID, req.Weights, req.Round, req.LayerTag)
 	if err != nil {
+		recordServiceEvent(r, req.ExperimentID, "encrypt", start, req.Round, req.ClientID, req.LayerTag, 0, 0, len(req.Weights), err)
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	recordServiceEvent(r, req.ExperimentID, "encrypt", start, req.Round, req.ClientID, req.LayerTag, 0, len(resp.CipherIDs), len(req.Weights), nil)
 
 	success(w, "模型加密完成", resp)
 }
@@ -193,11 +213,14 @@ func aggregateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp, err := service.Aggregate(req.CipherGroups, req.Round, req.Average, req.ClientCount)
 	if err != nil {
+		recordServiceEvent(r, req.ExperimentID, "aggregate", start, req.Round, "", "", totalCipherInputs(req.CipherGroups), 0, 0, err)
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	recordServiceEvent(r, req.ExperimentID, "aggregate", start, req.Round, "", "", totalCipherInputs(req.CipherGroups), len(resp.AggregatedCipherIDs), 0, nil)
 
 	success(w, "聚合完成", resp)
 }
@@ -218,11 +241,14 @@ func decryptHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp, err := service.Decrypt(req.CipherIDs, req.WeightCount)
 	if err != nil {
+		recordServiceEvent(r, req.ExperimentID, "decrypt", start, 0, "", "", len(req.CipherIDs), 0, req.WeightCount, err)
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	recordServiceEvent(r, req.ExperimentID, "decrypt", start, 0, "", "", len(req.CipherIDs), 0, resp.Length, nil)
 
 	success(w, "解密成功", resp)
 }
@@ -243,11 +269,14 @@ func partialDecryptHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp, err := service.PartialDecrypt(req.CipherIDs, req.ClientID)
 	if err != nil {
+		recordServiceEvent(r, req.ExperimentID, "partial_decrypt", start, 0, req.ClientID, "", len(req.CipherIDs), 0, 0, err)
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	recordServiceEvent(r, req.ExperimentID, "partial_decrypt", start, 0, req.ClientID, "", len(req.CipherIDs), len(resp.CipherIDs), 0, nil)
 
 	success(w, "部分解密完成", resp)
 }
@@ -268,11 +297,14 @@ func finalDecryptHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp, err := service.FinalDecrypt(req.CipherIDs, req.WeightCount)
 	if err != nil {
+		recordServiceEvent(r, req.ExperimentID, "final_decrypt", start, 0, "", "", len(req.CipherIDs), 0, req.WeightCount, err)
 		fail(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	recordServiceEvent(r, req.ExperimentID, "final_decrypt", start, 0, "", "", len(req.CipherIDs), 0, resp.Length, nil)
 
 	success(w, "最终解密成功", resp)
 }
@@ -327,7 +359,9 @@ func cleanupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp := service.Cleanup(req.Round)
+	recordServiceEvent(r, req.ExperimentID, "cipher_cleanup", start, req.Round, "", "", 0, 0, resp.DeletedCount, nil)
 	success(w, "清理完成", resp)
 }
 
@@ -341,7 +375,9 @@ func advanceRoundHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	start := time.Now()
 	resp := service.AdvanceRound()
+	recordServiceEvent(r, "", "round_advance", start, resp.CurrentRound, "", "", 0, 0, 0, nil)
 	success(w, "轮次已推进", resp)
 }
 
@@ -352,6 +388,12 @@ func advanceRoundHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	startTime = time.Now()
 	service = NewHEService()
+
+	tracker, err := NewExperimentTracker(strings.TrimSpace(os.Getenv("MKHE_EXPERIMENT_DIR")))
+	if err != nil {
+		log.Fatalf("experiment tracker init failed: %v", err)
+	}
+	experimentTracker = tracker
 
 	mux := http.NewServeMux()
 
@@ -378,6 +420,14 @@ func main() {
 
 	// ---- 轮次管理 ----
 	mux.HandleFunc("/api/v1/round/advance", advanceRoundHandler)
+
+	// ---- 实验追踪 ----
+	mux.HandleFunc("/api/v1/experiments/start", experimentsStartHandler)
+	mux.HandleFunc("/api/v1/experiments/stop", experimentsStopHandler)
+	mux.HandleFunc("/api/v1/experiments/active", experimentsActiveHandler)
+	mux.HandleFunc("/api/v1/experiments/event", experimentsManualEventHandler)
+	mux.HandleFunc("/api/v1/experiments", experimentsListHandler)
+	mux.HandleFunc("/api/v1/experiments/", experimentsDetailHandler)
 
 	// 组装中间件
 	handler := loggingMiddleware(corsMiddleware(mux))

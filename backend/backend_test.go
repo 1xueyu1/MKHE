@@ -751,6 +751,11 @@ func TestPrintAPISummary(t *testing.T) {
 		{"DELETE", "/api/v1/cipher/{id}", "删除密文"},
 		{"POST", "/api/v1/cipher/cleanup", "批量清理密文"},
 		{"POST", "/api/v1/round/advance", "推进训练轮次"},
+		{"POST", "/api/v1/experiments/start", "启动实验追踪"},
+		{"POST", "/api/v1/experiments/stop", "停止实验追踪"},
+		{"GET", "/api/v1/experiments", "实验列表"},
+		{"GET", "/api/v1/experiments/{id}/summary", "实验汇总"},
+		{"GET", "/api/v1/experiments/{id}/plot-data", "实验绘图数据"},
 	}
 
 	fmt.Println("\n╔══════════════════════════════════════════════════════════════╗")
